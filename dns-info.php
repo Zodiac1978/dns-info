@@ -20,7 +20,7 @@ if ( ! defined( 'ABSPATH' ) ) {
  * @param  array $debug_info Array of the Health Check debug information.
  * @return array             Modified array with newly added DNS section.
  */
-function custom_health_check_dns_section( $debug_info ) {
+function dns_info_custom_health_check_dns_section( $debug_info ) {
 	// Get site URL.
 	$site_url = wp_parse_url( get_site_url(), PHP_URL_HOST );
 
@@ -166,14 +166,22 @@ function custom_health_check_dns_section( $debug_info ) {
 	// CNAME Records.
 	$cname_field = array(
 		'label' => __( 'CNAME Records', 'dns-info' ),
-		'value' => !empty( $cname_records ) ? implode( ' | ', array_column( $cname_records, 'target' ) ) : __( 'No CNAME records found', 'dns-info' ),
+		'value' => ! empty( $cname_records ) ? implode( ' | ', array_column( $cname_records, 'target' ) ) : __( 'No CNAME records found', 'dns-info' ),
 	);
 	$dns_debug_info['fields']['cname'] = $cname_field;
 
 	// SOA Records.
 	$soa_field = array(
 		'label' => __( 'SOA Records', 'dns-info' ),
-		'value' => ! empty( $soa_records ) ? implode( ' | ', array_map( function( $record ) { return "Primary Name Server: {$record['mname']}, Responsible Email Address: {$record['rname']}"; }, $soa_records ) ) : __( 'No SOA records found', 'dns-info' ),
+		'value' => ! empty( $soa_records ) ? implode(
+			' | ',
+			array_map(
+				function( $record ) {
+					return "Primary Name Server: {$record['mname']}, Responsible Email Address: {$record['rname']}";
+				},
+				$soa_records
+			)
+		) : __( 'No SOA records found', 'dns-info' ),
 	);
 	$dns_debug_info['fields']['soa'] = $soa_field;
 
@@ -184,31 +192,31 @@ function custom_health_check_dns_section( $debug_info ) {
 }
 
 // Add the custom DNS section to debug information.
-add_filter( 'debug_information', 'custom_health_check_dns_section' );
+add_filter( 'debug_information', 'dns_info_custom_health_check_dns_section' );
 
 
 /**
- * [myplugin_add_spf_check description]
+ * Register site status check for SPF record.
  *
- * @param  [type] $tests [description].
- * @return [type]        [description]
+ * @param  array $tests Array of current checks.
+ * @return array        Array with addition of spf check.
  */
-function myplugin_add_spf_check( $tests ) {
+function dns_info_register_spf_record_check( $tests ) {
 	$tests['direct']['spf_record'] = array(
 		'label' => __( 'SPF Record Check' ),
-		'test'  => 'myplugin_spf_check',
+		'test'  => 'dns_info_spf_record_check',
 	);
 	return $tests;
 }
-add_filter( 'site_status_tests', 'myplugin_add_spf_check' );
+add_filter( 'site_status_tests', 'dns_info_register_spf_record_check' );
 
 
 /**
- * [myplugin_spf_check description]
+ * Add site status check for SPF record.
  *
- * @return [type] [description]
+ * @return array Array of results with addition for spf check.
  */
-function myplugin_spf_check() {
+function dns_info_spf_record_check() {
 	$result = array(
 		'label'       => __( 'SPF Record is properly configured' ),
 		'status'      => 'good',
@@ -224,11 +232,11 @@ function myplugin_spf_check() {
 		'test'        => 'spf_record',
 	);
 
-	$domain     = get_site_url();
+	$domain     = wp_parse_url( get_site_url(), PHP_URL_HOST );
 	$spf_record = get_spf_record( $domain );
 
 	if ( empty( $spf_record ) ) {
-		$result['status']      = 'critical';
+		$result['status']      = 'recommended';
 		$result['label']       = __( 'SPF Record is not found' );
 		$result['description'] = sprintf(
 			'<p>%s</p>',
@@ -244,10 +252,10 @@ function myplugin_spf_check() {
 }
 
 /**
- * [get_spf_record description]
+ * Get SPF record
  *
- * @param  [type] $domain [description].
- * @return [type]         [description]
+ * @param  string $domain Host to get the SPF record from.
+ * @return string         String with SPF record or empty if no SPF record found.
  */
 function get_spf_record( $domain ) {
 	$spf_record = dns_get_record( $domain, DNS_TXT );
