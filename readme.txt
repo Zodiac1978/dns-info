@@ -2,7 +2,7 @@
 Contributors: zodiac1978
 Donate link: https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=LCH9UVV7RKDFY
 Tags: DNS, SPF, DMARC,
-Requires at least: 4.4.0
+Requires at least: 5.2.0
 Tested up to: 6.4
 Requires PHP: 5.6
 Stable tag: 1.0.0
