@@ -24,6 +24,30 @@ function dns_info_custom_health_check_dns_section( $debug_info ) {
 	// Get site URL.
 	$site_url = wp_parse_url( get_site_url(), PHP_URL_HOST );
 
+	// Initialize debug info for DNS section.
+	$dns_debug_info = array(
+		'label'  => __( 'DNS Settings', 'dns-info' ),
+		'fields' => array(),
+	);
+
+	// Define localhost IPs.
+	$whitelist = array(
+		'127.0.0.1',
+		'::1',
+	);
+
+	// Check for local IP and stop if detected.
+	if ( isset( $_SERVER['REMOTE_ADDR'] ) && in_array( $_SERVER['REMOTE_ADDR'], $whitelist, true ) ) {
+		$dns_debug_info['fields']['local'] = array(
+			'label' => __( 'Localhost install detected', 'dns-info' ),
+			'value' => __( 'This section only works with a valid domain.', 'dns-info' ),
+		);
+		// Add DNS debug info to overall debug info.
+		$debug_info['custom_dns_settings'] = $dns_debug_info;
+
+		return $debug_info;
+	}
+
 	// Fetch SPF record.
 	$spf_records = dns_get_record( $site_url, DNS_TXT );
 
@@ -50,12 +74,6 @@ function dns_info_custom_health_check_dns_section( $debug_info ) {
 
 	// Fetch SOA record.
 	$soa_records = dns_get_record( $site_url, DNS_SOA );
-
-	// Initialize debug info for DNS section.
-	$dns_debug_info = array(
-		'label'  => __( 'DNS Settings', 'dns-info' ),
-		'fields' => array(),
-	);
 
 	// Check SPF record.
 	$spf_field = array();
