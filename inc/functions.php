@@ -97,3 +97,19 @@ function get_domain( $url = null ) {
 	}
 	return '';
 }
+
+/**
+ * Get SPF record
+ *
+ * @param  string $domain Host to get the SPF record from.
+ * @return string         String with SPF record or empty if no SPF record found.
+ */
+function get_spf_record( $domain ) {
+	$spf_record = dns_get_record( $domain, DNS_TXT );
+	foreach ( $spf_record as $record ) {
+		if ( strpos( $record['txt'], 'v=spf1' ) !== false ) {
+			return $record['txt'];
+		}
+	}
+	return '';
+}

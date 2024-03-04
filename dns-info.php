@@ -246,7 +246,7 @@ function dns_info_spf_record_check() {
 		'status'      => 'good',
 		'badge'       => array(
 			'label' => __( 'Security' ),
-			'color' => 'green',
+			'color' => 'blue',
 		),
 		'description' => sprintf(
 			'<p>%s</p>',
@@ -273,20 +273,4 @@ function dns_info_spf_record_check() {
 	}
 
 	return $result;
-}
-
-/**
- * Get SPF record
- *
- * @param  string $domain Host to get the SPF record from.
- * @return string         String with SPF record or empty if no SPF record found.
- */
-function get_spf_record( $domain ) {
-	$spf_record = dns_get_record( $domain, DNS_TXT );
-	foreach ( $spf_record as $record ) {
-		if ( strpos( $record['txt'], 'v=spf1' ) !== false ) {
-			return $record['txt'];
-		}
-	}
-	return '';
 }
