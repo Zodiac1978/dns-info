@@ -14,6 +14,9 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit; // Exit if accessed directly.
 }
 
+// Load helper functions.
+require dirname( __FILE__ ) . '/inc/functions.php';
+
 /**
  * Add custom DNS section to Health Check debug information
  *
@@ -23,6 +26,9 @@ if ( ! defined( 'ABSPATH' ) ) {
 function dns_info_custom_health_check_dns_section( $debug_info ) {
 	// Get site URL.
 	$site_url = wp_parse_url( get_site_url(), PHP_URL_HOST );
+
+	// Remove subdomains.
+	$site_url = get_domain( $site_url );
 
 	// Initialize debug info for DNS section.
 	$dns_debug_info = array(
