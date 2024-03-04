@@ -25,7 +25,7 @@ function tld_list( $cache_dir = null ) {
 			// The list is older than 30 days so delete everything first.
 			if ( file_exists( $list_dir ) ) {
 				foreach ( glob( $list_dir . '*' ) as $filename ) {
-					unlink( $filename );
+					wp_delete_file( $filename );
 				}
 				rmdir( $list_dir );
 			}
