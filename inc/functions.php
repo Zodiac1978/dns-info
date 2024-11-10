@@ -91,7 +91,7 @@ function get_domain( $url = null ) {
 	$tld_dir = tld_list();
 
 	// No url = our own host.
-	$url = isset( $url ) ? $url : $_SERVER['SERVER_NAME'];
+	$url = isset( $url ) ? $url : ( isset( $_SERVER['SERVER_NAME'] ) ? sanitize_text_field( wp_unslash( $_SERVER['SERVER_NAME'] ) ) : '' );
 
 	// Add missing scheme (ftp:// or http:// or ftps:// or https://).
 	$url = ! isset( $url[5] ) || ( $url[3] !== ':' && $url[4] !== ':' && $url[5] !== ':' ) ? 'http://' . $url : $url;
