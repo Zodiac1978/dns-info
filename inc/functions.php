@@ -81,6 +81,43 @@ function tld_list( $cache_dir = null ) {
 }
 
 /**
+ * Get domain of a given URL
+ *
+ * @param  string $url The given URL.
+ * @return string      The root domain name with TLD.
+ */
+function get_domain( $url = null ) {
+	// Obtain location of public suffix list.
+	$tld_dir = tld_list();
+
+	// No url = our own host.
+	$url = isset( $url ) ? $url : $_SERVER['SERVER_NAME'];
+
+	// Add missing scheme (ftp:// or http:// or ftps:// or https://).
+	$url = ! isset( $url[5] ) || ( $url[3] !== ':' && $url[4] !== ':' && $url[5] !== ':' ) ? 'http://' . $url : $url;
+
+	// Remove "/path/file.html", "/:80", etc.
+	$url = wp_parse_url( $url, PHP_URL_HOST );
+
+	// Replace absolute domain name by relative (http://www.dns-sd.org/TrailingDotsInDomainNames.html).
+	$url = trim( $url, '.' );
+
+	// Check if TLD exists.
+	$url   = explode( '.', $url );
+	$parts = array_reverse( $url );
+
+	foreach ( $parts as $key => $part ) {
+		$tld = implode( '.', $parts );
+		if ( file_exists( $tld_dir . $tld ) ) {
+			return ! $key ? '' : implode( '.', array_slice( $url, $key - 1 ) );
+		}
+		// Remove last part.
+		array_pop( $parts );
+	}
+	return '';
+}
+
+/**
  * Get SPF record
  *
  * @param  string $domain Host to get the SPF record from.
@@ -90,6 +127,22 @@ function get_spf_record( $domain ) {
 	$spf_record = dns_get_record( $domain, DNS_TXT );
 	foreach ( $spf_record as $record ) {
 		if ( strpos( $record['txt'], 'v=spf1' ) !== false ) {
+			return $record['txt'];
+		}
+	}
+	return '';
+}
+
+/**
+ * Get DMARC record
+ *
+ * @param  string $domain Host to get the DMARC record from.
+ * @return string         String with DMARC record or empty if no DMARC record found.
+ */
+function get_dmarc_record( $domain ) {
+	$dmarc_record = dns_get_record( "_dmarc.$domain", DNS_TXT );
+	foreach ( $dmarc_record as $record ) {
+		if ( strpos( $record['txt'], 'v=DMARC1' ) !== false ) {
 			return $record['txt'];
 		}
 	}
