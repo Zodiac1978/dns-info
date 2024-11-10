@@ -6,7 +6,7 @@
  * Version:     1.0.0
  * Author:      Torsten Landsiedel
  * Author URI:  https://torstenlandsiedel.de
- * Licence:     GPL 2
+ * License:     GPL 2
  * License URI: http://opensource.org/licenses/GPL-2.0
  */
 
