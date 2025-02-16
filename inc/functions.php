@@ -12,7 +12,8 @@ function tld_list( $cache_dir = null ) {
 
 	// Initialize WP_Filesystem if not already available.
 	if ( ! function_exists( 'WP_Filesystem' ) ) {
-		require_once ABSPATH . '/wp-admin/includes/file.php';
+		/** @phpstan-ignore-next-line */
+		require_once ABSPATH . 'wp-admin/includes/file.php';
 	}
 	WP_Filesystem();
 
