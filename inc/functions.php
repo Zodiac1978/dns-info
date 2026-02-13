@@ -35,7 +35,6 @@ function tld_list( $cache_dir = null ) {
 
 	// Initialize WP_Filesystem if not already available.
 	if ( ! function_exists( 'WP_Filesystem' ) ) {
-		/** @phpstan-ignore-next-line */
 		require_once ABSPATH . 'wp-admin/includes/file.php';
 	}
 	WP_Filesystem();
@@ -155,7 +154,7 @@ function get_domain( $url = null ) {
  */
 function get_spf_record( $domain ) {
 	$spf_record = dns_info_get_dns_records( $domain, DNS_TXT );
-	if ( ! is_array( $spf_record ) || empty( $spf_record ) ) {
+	if ( empty( $spf_record ) ) {
 		return '';
 	}
 
@@ -175,7 +174,7 @@ function get_spf_record( $domain ) {
  */
 function get_dmarc_record( $domain ) {
 	$dmarc_record = dns_info_get_dns_records( "_dmarc.$domain", DNS_TXT );
-	if ( ! is_array( $dmarc_record ) || empty( $dmarc_record ) ) {
+	if ( empty( $dmarc_record ) ) {
 		return '';
 	}
 
