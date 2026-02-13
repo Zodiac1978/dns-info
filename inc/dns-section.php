@@ -60,7 +60,7 @@ function dns_info_custom_health_check_dns_section( $debug_info ) {
 
 	// Fetch PTR record only when at least one valid A record exists.
 	$ptr_record = '';
-	if ( is_array( $a_records ) && ! empty( $a_records ) && isset( $a_records[0]['ip'] ) ) {
+	if ( ! empty( $a_records ) && isset( $a_records[0]['ip'] ) ) {
 		$ptr_record = gethostbyaddr( $a_records[0]['ip'] );
 	}
 
@@ -69,16 +69,6 @@ function dns_info_custom_health_check_dns_section( $debug_info ) {
 
 	// Fetch SOA record.
 	$soa_records = dns_info_get_dns_records( $site_url, DNS_SOA );
-
-	// Normalize potential false returns from dns_get_record().
-	$spf_records   = is_array( $spf_records ) ? $spf_records : array();
-	$mx_records    = is_array( $mx_records ) ? $mx_records : array();
-	$a_records     = is_array( $a_records ) ? $a_records : array();
-	$aaaa_records  = is_array( $aaaa_records ) ? $aaaa_records : array();
-	$ns_records    = is_array( $ns_records ) ? $ns_records : array();
-	$dmarc_records = is_array( $dmarc_records ) ? $dmarc_records : array();
-	$cname_records = is_array( $cname_records ) ? $cname_records : array();
-	$soa_records   = is_array( $soa_records ) ? $soa_records : array();
 
 	// Check SPF record.
 	$spf_field = array();
