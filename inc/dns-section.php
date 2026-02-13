@@ -7,11 +7,9 @@
  * @return array             Modified array with newly added DNS section.
  */
 function dns_info_custom_health_check_dns_section( $debug_info ) {
-	// Get site URL.
-	$site_url = wp_parse_url( get_site_url(), PHP_URL_HOST );
-
-	// Remove subdomains.
-	$site_url = get_domain( $site_url );
+	// Get site host and derived root domain.
+	$site_host = wp_parse_url( get_site_url(), PHP_URL_HOST );
+	$site_url  = get_domain( $site_host );
 
 	// Initialize debug info for DNS section.
 	$dns_debug_info = array(
@@ -19,14 +17,9 @@ function dns_info_custom_health_check_dns_section( $debug_info ) {
 		'fields' => array(),
 	);
 
-	// Define localhost IPs.
-	$whitelist = array(
-		'127.0.0.1',
-		'::1',
-	);
-
-	// Check for local IP and stop if detected.
-	if ( isset( $_SERVER['REMOTE_ADDR'] ) && in_array( $_SERVER['REMOTE_ADDR'], $whitelist, true ) ) {
+	// Stop for localhost-style hostnames.
+	$is_local_host = in_array( $site_host, array( 'localhost' ), true ) || filter_var( $site_host, FILTER_VALIDATE_IP );
+	if ( $is_local_host ) {
 		$dns_debug_info['fields']['local'] = array(
 			'label' => __( 'Localhost install detected', 'dns-info' ),
 			'value' => __( 'This section only works with a valid domain.', 'dns-info' ),
@@ -37,37 +30,60 @@ function dns_info_custom_health_check_dns_section( $debug_info ) {
 		return $debug_info;
 	}
 
+	// If domain resolution failed, show explicit error instead of localhost message.
+	if ( empty( $site_url ) ) {
+		$dns_debug_info['fields']['domain_error'] = array(
+			'label' => __( 'Domain resolution failed', 'dns-info' ),
+			'value' => __( 'Could not determine a valid domain for DNS checks.', 'dns-info' ),
+		);
+		$debug_info['custom_dns_settings'] = $dns_debug_info;
+		return $debug_info;
+	}
+
 	// Fetch SPF record.
-	$spf_records = dns_get_record( $site_url, DNS_TXT );
+	$spf_records = dns_info_get_dns_records( $site_url, DNS_TXT );
 
 	// Fetch MX records.
-	$mx_records = dns_get_record( $site_url, DNS_MX );
+	$mx_records = dns_info_get_dns_records( $site_url, DNS_MX );
 
 	// Fetch A record.
-	$a_records = dns_get_record( $site_url, DNS_A );
+	$a_records = dns_info_get_dns_records( $site_url, DNS_A );
 
 	// Fetch AAAA record.
-	$aaaa_records = dns_get_record( $site_url, DNS_AAAA );
+	$aaaa_records = dns_info_get_dns_records( $site_url, DNS_AAAA );
 
 	// Fetch NS records.
-	$ns_records = dns_get_record( $site_url, DNS_NS );
+	$ns_records = dns_info_get_dns_records( $site_url, DNS_NS );
 
 	// Fetch DMARC record.
-	$dmarc_records = dns_get_record( "_dmarc.$site_url", DNS_TXT );
+	$dmarc_records = dns_info_get_dns_records( "_dmarc.$site_url", DNS_TXT );
 
-	// Fetch PTR record.
-	$ptr_record = gethostbyaddr( $a_records[0]['ip'] );
+	// Fetch PTR record only when at least one valid A record exists.
+	$ptr_record = '';
+	if ( is_array( $a_records ) && ! empty( $a_records ) && isset( $a_records[0]['ip'] ) ) {
+		$ptr_record = gethostbyaddr( $a_records[0]['ip'] );
+	}
 
 	// Fetch CNAME record.
-	$cname_records = dns_get_record( $site_url, DNS_CNAME );
+	$cname_records = dns_info_get_dns_records( $site_url, DNS_CNAME );
 
 	// Fetch SOA record.
-	$soa_records = dns_get_record( $site_url, DNS_SOA );
+	$soa_records = dns_info_get_dns_records( $site_url, DNS_SOA );
+
+	// Normalize potential false returns from dns_get_record().
+	$spf_records   = is_array( $spf_records ) ? $spf_records : array();
+	$mx_records    = is_array( $mx_records ) ? $mx_records : array();
+	$a_records     = is_array( $a_records ) ? $a_records : array();
+	$aaaa_records  = is_array( $aaaa_records ) ? $aaaa_records : array();
+	$ns_records    = is_array( $ns_records ) ? $ns_records : array();
+	$dmarc_records = is_array( $dmarc_records ) ? $dmarc_records : array();
+	$cname_records = is_array( $cname_records ) ? $cname_records : array();
+	$soa_records   = is_array( $soa_records ) ? $soa_records : array();
 
 	// Check SPF record.
 	$spf_field = array();
 	foreach ( $spf_records as $record ) {
-		if ( strpos( $record['txt'], 'v=spf1' ) === 0 ) {
+		if ( isset( $record['txt'] ) && strpos( $record['txt'], 'v=spf1' ) === 0 ) {
 			$spf_field['value'] = $record['txt'];
 			break;
 		}
@@ -89,13 +105,16 @@ function dns_info_custom_health_check_dns_section( $debug_info ) {
 		'label' => __( 'MX Records', 'dns-info' ),
 		'value' => ! empty( $mx_records ) ? implode(
 			' | ',
-			array_map(
-				function( $record ) {
-					return "Priority: {$record['pri']}, Host: {$record['target']}"; },
-				$mx_records
-			)
-		) : __( 'No MX records found', 'dns-info' ),
-	);
+				array_map(
+					function( $record ) {
+						$priority = isset( $record['pri'] ) ? $record['pri'] : __( 'n/a', 'dns-info' );
+						$target   = isset( $record['target'] ) ? $record['target'] : __( 'n/a', 'dns-info' );
+						return "Priority: {$priority}, Host: {$target}";
+					},
+					$mx_records
+				)
+			) : __( 'No MX records found', 'dns-info' ),
+		);
 	$dns_debug_info['fields']['mx'] = $mx_field;
 
 	// A Records.
@@ -103,13 +122,15 @@ function dns_info_custom_health_check_dns_section( $debug_info ) {
 		'label' => __( 'A Record', 'dns-info' ),
 		'value' => ! empty( $a_records ) ? implode(
 			' | ',
-			array_map(
-				function( $record ) {
-					return "IPv4 Address: {$record['ip']} (TTL: {$record['ttl']} )";
-				},
-				$a_records
-			)
-		) : __( 'No A records found', 'dns-info' ),
+				array_map(
+					function( $record ) {
+						$ip  = isset( $record['ip'] ) ? $record['ip'] : __( 'n/a', 'dns-info' );
+						$ttl = isset( $record['ttl'] ) ? $record['ttl'] : __( 'n/a', 'dns-info' );
+						return "IPv4 Address: {$ip} (TTL: {$ttl})";
+					},
+					$a_records
+				)
+			) : __( 'No A records found', 'dns-info' ),
 	);
 	$dns_debug_info['fields']['a'] = $a_field;
 
@@ -118,13 +139,15 @@ function dns_info_custom_health_check_dns_section( $debug_info ) {
 		'label' => __( 'AAAA Record', 'dns-info' ),
 		'value' => ! empty( $aaaa_records ) ? implode(
 			' | ',
-			array_map(
-				function( $record ) {
-					return "IPv6 Address: {$record['ipv6']} (TTL: {$record['ttl']} )";
-				},
-				$aaaa_records
-			)
-		) : __( 'No AAAA records found', 'dns-info' ),
+				array_map(
+					function( $record ) {
+						$ipv6 = isset( $record['ipv6'] ) ? $record['ipv6'] : __( 'n/a', 'dns-info' );
+						$ttl  = isset( $record['ttl'] ) ? $record['ttl'] : __( 'n/a', 'dns-info' );
+						return "IPv6 Address: {$ipv6} (TTL: {$ttl})";
+					},
+					$aaaa_records
+				)
+			) : __( 'No AAAA records found', 'dns-info' ),
 	);
 	$dns_debug_info['fields']['aaaa'] = $aaaa_field;
 
@@ -133,20 +156,21 @@ function dns_info_custom_health_check_dns_section( $debug_info ) {
 		'label' => __( 'NS Records', 'dns-info' ),
 		'value' => ! empty( $ns_records ) ? implode(
 			' | ',
-			array_map(
-				function( $record ) {
-					return "Name Server: {$record['target']}";
-				},
-				$ns_records
-			)
-		) : __( 'No NS records found', 'dns-info' ),
+				array_map(
+					function( $record ) {
+						$target = isset( $record['target'] ) ? $record['target'] : __( 'n/a', 'dns-info' );
+						return "Name Server: {$target}";
+					},
+					$ns_records
+				)
+			) : __( 'No NS records found', 'dns-info' ),
 	);
 	$dns_debug_info['fields']['ns'] = $ns_field;
 
 	// DMARC Record.
 	$dmarc_field = array();
 	foreach ( $dmarc_records as $record ) {
-		if ( strpos( $record['txt'], 'v=DMARC1' ) === 0 ) {
+		if ( isset( $record['txt'] ) && strpos( $record['txt'], 'v=DMARC1' ) === 0 ) {
 			$dmarc_field['value'] = $record['txt'];
 			break;
 		}
@@ -173,7 +197,15 @@ function dns_info_custom_health_check_dns_section( $debug_info ) {
 	// CNAME Records.
 	$cname_field = array(
 		'label' => __( 'CNAME Records', 'dns-info' ),
-		'value' => ! empty( $cname_records ) ? implode( ' | ', array_column( $cname_records, 'target' ) ) : __( 'No CNAME records found', 'dns-info' ),
+		'value' => ! empty( $cname_records ) ? implode(
+			' | ',
+			array_map(
+				function( $record ) {
+					return isset( $record['target'] ) ? $record['target'] : __( 'n/a', 'dns-info' );
+				},
+				$cname_records
+			)
+		) : __( 'No CNAME records found', 'dns-info' ),
 	);
 	$dns_debug_info['fields']['cname'] = $cname_field;
 
@@ -182,13 +214,15 @@ function dns_info_custom_health_check_dns_section( $debug_info ) {
 		'label' => __( 'SOA Records', 'dns-info' ),
 		'value' => ! empty( $soa_records ) ? implode(
 			' | ',
-			array_map(
-				function( $record ) {
-					return "Primary Name Server: {$record['mname']}, Responsible Email Address: {$record['rname']}";
-				},
-				$soa_records
-			)
-		) : __( 'No SOA records found', 'dns-info' ),
+				array_map(
+					function( $record ) {
+						$mname = isset( $record['mname'] ) ? $record['mname'] : __( 'n/a', 'dns-info' );
+						$rname = isset( $record['rname'] ) ? $record['rname'] : __( 'n/a', 'dns-info' );
+						return "Primary Name Server: {$mname}, Responsible Email Address: {$rname}";
+					},
+					$soa_records
+				)
+			) : __( 'No SOA records found', 'dns-info' ),
 	);
 	$dns_debug_info['fields']['soa'] = $soa_field;
 

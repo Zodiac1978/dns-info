@@ -1,6 +1,29 @@
 <?php
 
 /**
+ * Cached wrapper for dns_get_record().
+ *
+ * @param string $domain Domain to query.
+ * @param int    $type   DNS_* constant.
+ * @param int    $ttl    Cache TTL in seconds.
+ * @return array         DNS records or empty array on failure.
+ */
+function dns_info_get_dns_records( $domain, $type, $ttl = 300 ) {
+	$cache_key = 'dns_info_' . md5( strtolower( $domain ) . '|' . (string) $type );
+	$cached    = get_transient( $cache_key );
+
+	if ( false !== $cached ) {
+		return is_array( $cached ) ? $cached : array();
+	}
+
+	$records = dns_get_record( $domain, $type );
+	$records = is_array( $records ) ? $records : array();
+
+	set_transient( $cache_key, $records, $ttl );
+	return $records;
+}
+
+/**
  * Get domain name without subdomain
  * Based on: https://stackoverflow.com/questions/2679618/get-domain-name-not-subdomain-in-php
  *
@@ -15,6 +38,9 @@ function tld_list( $cache_dir = null ) {
 		require_once ABSPATH . 'wp-admin/includes/file.php';
 	}
 	WP_Filesystem();
+	if ( ! isset( $wp_filesystem ) || ! is_object( $wp_filesystem ) ) {
+		return '';
+	}
 
 	// Use "/tmp" if $cache_dir is not set.
 	$cache_dir = isset( $cache_dir ) ? $cache_dir : sys_get_temp_dir();
@@ -70,6 +96,9 @@ function tld_list( $cache_dir = null ) {
 			// Split the TLD list to reduce memory usage.
 			$wp_filesystem->touch( $list_dir . $line );
 		}
+
+		// Release lock after successful refresh.
+		$wp_filesystem->rmdir( $lock_dir );
 	}
 
 	// Repair locks (should never happen).
@@ -124,9 +153,13 @@ function get_domain( $url = null ) {
  * @return string         String with SPF record or empty if no SPF record found.
  */
 function get_spf_record( $domain ) {
-	$spf_record = dns_get_record( $domain, DNS_TXT );
+	$spf_record = dns_info_get_dns_records( $domain, DNS_TXT );
+	if ( ! is_array( $spf_record ) || empty( $spf_record ) ) {
+		return '';
+	}
+
 	foreach ( $spf_record as $record ) {
-		if ( strpos( $record['txt'], 'v=spf1' ) !== false ) {
+		if ( isset( $record['txt'] ) && strpos( $record['txt'], 'v=spf1' ) !== false ) {
 			return $record['txt'];
 		}
 	}
@@ -140,9 +173,13 @@ function get_spf_record( $domain ) {
  * @return string         String with DMARC record or empty if no DMARC record found.
  */
 function get_dmarc_record( $domain ) {
-	$dmarc_record = dns_get_record( "_dmarc.$domain", DNS_TXT );
+	$dmarc_record = dns_info_get_dns_records( "_dmarc.$domain", DNS_TXT );
+	if ( ! is_array( $dmarc_record ) || empty( $dmarc_record ) ) {
+		return '';
+	}
+
 	foreach ( $dmarc_record as $record ) {
-		if ( strpos( $record['txt'], 'v=DMARC1' ) !== false ) {
+		if ( isset( $record['txt'] ) && strpos( $record['txt'], 'v=DMARC1' ) !== false ) {
 			return $record['txt'];
 		}
 	}
